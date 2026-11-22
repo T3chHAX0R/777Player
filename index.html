@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#14171d">
+  <title>777Player</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-777">777</span>Player</div>
+
+      <form class="search-box" id="searchForm" autocomplete="off">
+        <span class="search-ic" data-icon="search"></span>
+        <input id="searchInput" type="search" placeholder="搜尋歌曲、歌手…  ( / )" enterkeyhint="search">
+      </form>
+
+      <nav class="nav" id="nav">
+        <button class="nav-item" data-view="home"><span data-icon="home"></span>首頁</button>
+        <button class="nav-item" data-view="search"><span data-icon="search"></span>搜尋結果</button>
+        <button class="nav-item" data-view="favorites"><span data-icon="heart"></span>我的最愛<span class="count" id="favCount"></span></button>
+        <button class="nav-item" data-view="queue"><span data-icon="list"></span>播放佇列<span class="count" id="queueCount"></span></button>
+        <button class="nav-item mobile-only" id="mImportBtn"><span data-icon="plus"></span>匯入歌單</button>
+        <button class="nav-item mobile-only" id="mSettingsBtn"><span data-icon="settings"></span>設定</button>
+      </nav>
+
+      <div class="section-title">
+        <span>我的歌單</span>
+        <button class="icon-btn sm" id="importBtn" title="匯入歌單" data-icon="plus"></button>
+      </div>
+      <div class="playlist-nav" id="playlistNav"></div>
+
+      <div class="sidebar-footer">
+        <button class="nav-item" id="settingsBtn"><span data-icon="settings"></span>設定</button>
+        <div class="quota" id="quota" title="本機估算的今日 API 呼叫次數"></div>
+        <button class="sync-status" id="syncStatus"></button>
+      </div>
+    </aside>
+
+    <main class="main" id="main"></main>
+  </div>
+
+  <!-- 正在播放（歌詞）畫面 -->
+  <section class="np" id="np" aria-hidden="true">
+    <div class="np-bg" id="npBg"></div>
+    <button class="icon-btn np-close" id="npClose" title="收起 (Esc)" data-icon="down"></button>
+    <div class="np-body">
+      <div class="np-left">
+        <div class="np-cover" id="npCover"></div>
+        <div class="np-title" id="npTitle"></div>
+        <div class="np-artist" id="npArtist"></div>
+      </div>
+      <div class="np-lyrics" id="npLyrics"></div>
+    </div>
+  </section>
+
+  <!-- 播放列 -->
+  <footer class="player">
+    <div class="p-left">
+      <div class="p-cover" id="pCover" title="展開歌詞"></div>
+      <div class="p-meta" id="pMeta" title="展開歌詞">
+        <div class="p-title" id="pTitle">尚未播放</div>
+        <div class="p-artist" id="pArtist">搜尋或匯入歌單開始聽歌</div>
+      </div>
+      <button class="icon-btn" id="pFav" title="加入我的最愛" data-icon="heart"></button>
+    </div>
+
+    <div class="p-center">
+      <div class="p-controls">
+        <button class="icon-btn" id="modeBtn"></button>
+        <button class="icon-btn" id="prevBtn" title="上一首 (Ctrl+←)" data-icon="prev"></button>
+        <button class="play-btn" id="playBtn" title="播放/暫停 (空白鍵)"></button>
+        <button class="icon-btn" id="nextBtn" title="下一首 (Ctrl+→)" data-icon="next"></button>
+        <button class="icon-btn" id="lyricBtn" title="歌詞" data-icon="lyric"></button>
+      </div>
+      <div class="p-progress">
+        <span class="time" id="curTime">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="播放進度">
+        <span class="time" id="durTime">0:00</span>
+      </div>
+    </div>
+
+    <div class="p-right">
+      <span class="level-tag" id="levelTag"></span>
+      <button class="icon-btn" id="muteBtn" title="靜音" data-icon="volume"></button>
+      <input type="range" id="volume" min="0" max="100" value="80" aria-label="音量">
+      <button class="icon-btn" id="queueBtn" title="播放佇列" data-icon="list"></button>
+    </div>
+  </footer>
+
+  <!-- 設定 -->
+  <dialog class="dlg" id="settingsDlg">
+    <form method="dialog">
+      <h3>設定</h3>
+      <label class="field">API Key
+        <input id="setKey" type="password" placeholder="chksz_..." spellcheck="false" autocomplete="off">
+      </label>
+      <label class="field">登入 Token（用來顯示官方剩餘額度）
+        <input id="setToken" type="password" placeholder="eyJ..." spellcheck="false" autocomplete="off">
+      </label>
+      <p class="hint" id="tokenHint"></p>
+      <label class="field">解析來源
+        <select id="setSource">
+          <option value="auto">自動：bugpk 優先，失敗改用 chksz（推薦）</option>
+          <option value="chksz">只用 chksz（穩定快速，每天 400 次）</option>
+          <option value="bugpk">只用 bugpk（免費無限，偶爾較慢或失效）</option>
+        </select>
+      </label>
+      <label class="field">音質
+        <select id="setLevel"></select>
+      </label>
+      <p class="hint">極高 320k 約 8MB/首；無損以上約 20–60MB/首，網路慢時可能卡頓。若選的音質不可用，API 會自動降級。</p>
+      <p class="hint" id="setQuota"></p>
+      <label class="field">雲端同步：GitHub Token（只需 gist 權限）
+        <input id="setGhToken" type="password" placeholder="ghp_... 或 github_pat_..." spellcheck="false" autocomplete="off">
+      </label>
+      <p class="hint" id="syncHint"></p>
+      <div class="dlg-actions">
+        <button type="button" class="btn ghost" id="syncNowBtn">立即同步</button>
+        <button type="button" class="btn ghost" id="clearLrcBtn">清除歌詞快取</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close>取消</button>
+        <button value="ok" class="btn primary">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 匯入歌單 -->
+  <dialog class="dlg" id="importDlg">
+    <form method="dialog">
+      <h3>匯入網易雲歌單</h3>
+      <label class="field">歌單 ID 或分享連結
+        <input id="importInput" placeholder="例如 5202687076 或 https://music.163.com/playlist?id=..." spellcheck="false">
+      </label>
+      <p class="hint">匯入後會存在本機，之後打開不需再呼叫 API（除非按「重新整理」）。</p>
+      <div class="dlg-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close>取消</button>
+        <button value="ok" class="btn primary">匯入</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+  <audio id="audio" preload="auto"></audio>
+
+  <!-- config.js 只存在你自己的電腦（不會上傳），部署到網路上時找不到也沒關係 -->
+  <script src="config.js" onerror="void 0"></script>
+  <script src="app.js"></script>
+  <script src="sync.js"></script>
+  <script>
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
