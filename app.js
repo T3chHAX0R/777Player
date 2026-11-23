@@ -77,7 +77,7 @@ const b64urlDecode = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-
   const m = location.hash.match(/^#setup=([A-Za-z0-9_-]+)/);
   if (!m) return;
   // 先把設定從網址列清掉，避免被截圖或留在瀏覽紀錄
-  window.history.replaceState(null, '', location.pathname + location.search);
+  window.history.replaceState(null, '', location.pathname);
   let cfg;
   try { cfg = b64urlDecode(m[1]); } catch { alert('這個設定連結格式不正確'); return; }
   const items = [cfg.k && 'chksz API Key', cfg.g && `雲端同步（${cfg.p || '預設'}）`].filter(Boolean);
@@ -1257,7 +1257,8 @@ $('#famGen').addEventListener('click', () => {
   const cfg = { p };
   if (k) cfg.k = k;
   if (g) cfg.g = g;
-  $('#famOut').value = `${base}#setup=${b64urlEncode(cfg)}`;
+  // openExternalBrowser=1：從 LINE 點開時改用手機的預設瀏覽器（不然設定會存進 LINE 內建瀏覽器）
+  $('#famOut').value = `${base}?openExternalBrowser=1#setup=${b64urlEncode(cfg)}`;
   $('#famResult').hidden = false;
 });
 $('#famCopy').addEventListener('click', async () => {
