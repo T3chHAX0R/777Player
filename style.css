@@ -413,3 +413,12 @@ body.is-playing .np-cover { transform: scale(1); }
   .np-title { margin-top: 0; font-size: 20px; }
   .lrc-line { font-size: 18px; }
 }
+
+/* 家人設定連結 */
+.fam-out {
+  width: 100%; margin: 14px 0 8px; padding: 10px 12px; resize: none;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--sub); font: 12px/1.5 ui-monospace, Consolas, monospace; word-break: break-all;
+}
+.hint.warn { color: var(--accent-2); margin-top: 10px; }
+#familyBtn { margin: 2px 0 6px; }

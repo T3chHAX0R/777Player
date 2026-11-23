@@ -120,6 +120,10 @@
         <input id="setGhToken" type="password" placeholder="ghp_... 或 github_pat_..." spellcheck="false" autocomplete="off">
       </label>
       <p class="hint" id="syncHint"></p>
+      <label class="field">同步名稱（選填。家人共用 Token 時各用一個，例如 mom）
+        <input id="setProfile" placeholder="留空 = 預設（你自己）" spellcheck="false" autocomplete="off" autocapitalize="off">
+      </label>
+      <button type="button" class="btn ghost" id="familyBtn">產生家人設定連結…</button>
       <div class="dlg-actions">
         <button type="button" class="btn ghost" id="syncNowBtn">立即同步</button>
         <button type="button" class="btn ghost" id="clearLrcBtn">清除歌詞快取</button>
@@ -142,6 +146,33 @@
         <span class="spacer"></span>
         <button type="button" class="btn ghost" data-close>取消</button>
         <button value="ok" class="btn primary">匯入</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 家人設定連結 -->
+  <dialog class="dlg" id="familyDlg">
+    <form method="dialog">
+      <h3>家人設定連結</h3>
+      <p class="hint">對方點這個連結就會自動設定好。手機和電腦各點一次，兩邊就會互相同步。每個人用不同的同步名稱，資料就不會混在一起。</p>
+      <label class="field">同步名稱（英文小寫或數字）
+        <input id="famProfile" placeholder="例如 mom" spellcheck="false" autocomplete="off" autocapitalize="off">
+      </label>
+      <label class="field">對方自己的 chksz API Key
+        <input id="famKey" type="password" placeholder="chksz_..." spellcheck="false" autocomplete="off">
+      </label>
+      <label class="field">GitHub Token（預設帶入你的，用來存對方的同步資料）
+        <input id="famGh" type="password" spellcheck="false" autocomplete="off">
+      </label>
+      <button type="button" class="btn primary" id="famGen">產生連結</button>
+      <div id="famResult" hidden>
+        <textarea id="famOut" class="fam-out" readonly rows="4"></textarea>
+        <button type="button" class="btn ghost" id="famCopy">複製連結</button>
+        <p class="hint warn">⚠ 這個連結等同密碼：只用私訊傳給本人，不要貼到群組或公開地方。</p>
+      </div>
+      <div class="dlg-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close>關閉</button>
       </div>
     </form>
   </dialog>

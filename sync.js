@@ -15,7 +15,10 @@ const SYNC_SECTIONS = {
   playback: ['queue', 'index', 'lastTime', 'mode'],
   settings: ['level', 'source'],
 };
-const SYNC_FILE = sec => `777player-${sec}.json`;
+// 同步名稱：家人共用同一個 GitHub Token 時，用不同名稱分開存（各自一個 gist）
+const cleanProfile = p => String(p || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 20);
+const syncProfile = () => cleanProfile(store.get('syncProfile', ''));
+const SYNC_FILE = sec => { const p = syncProfile(); return p ? `777player-${p}-${sec}.json` : `777player-${sec}.json`; };
 const SYNC_DESC = '777Player sync data (auto-generated)';
 const GH_API = localStorage.getItem('777p:syncApiBase') || 'https://api.github.com'; // 前者僅供測試用
 
@@ -271,6 +274,7 @@ function setSyncStatus(kind, msg = '') {
     kind === 'syncing' ? '☁ 同步中…' :
     kind === 'error' ? '☁ 同步失敗' :
     kind === 'ok' ? `☁ 已同步 ${hm(sync.lastOk)}` : '☁ 已連結';
+  if (sync.token && syncProfile()) el.textContent += `（${syncProfile()}）`;
   el.title = kind === 'error' ? msg : '點一下立即同步';
   const s = $('#syncHint');
   if (s) s.textContent = !sync.token
@@ -293,13 +297,19 @@ $('#syncStatus').addEventListener('click', () => syncNow({ silent: false }).then
 
 // 設定對話框：GitHub Token 欄位
 const settingsDlgEl = $('#settingsDlg');
-$('#settingsBtn').addEventListener('click', () => { $('#setGhToken').value = sync.token; setSyncStatus(sync.status); });
+$('#settingsBtn').addEventListener('click', () => {
+  $('#setGhToken').value = sync.token;
+  $('#setProfile').value = syncProfile();
+  setSyncStatus(sync.status);
+});
 settingsDlgEl.addEventListener('close', () => {
   if (settingsDlgEl.returnValue !== 'ok') return;
   const t = $('#setGhToken').value.trim();
-  if (t === sync.token) return;
+  const p = cleanProfile($('#setProfile').value);
+  if (t === sync.token && p === syncProfile()) return;
   sync.token = t;
   store.set('ghToken', t);
+  store.set('syncProfile', p);
   // 換帳號或移除 Token：重置連結狀態，下次連結時重新合併
   sync.meta = { gistId: '', linked: false, t: sync.meta.t, dirty: {} };
   saveMeta();
@@ -311,5 +321,6 @@ $('#syncNowBtn').addEventListener('click', () => syncNow({ silent: false }).then
 }));
 
 $('#setGhToken').value = sync.token;
+$('#setProfile').value = syncProfile();
 setSyncStatus(sync.token ? 'idle' : '');
 if (sync.token) syncNow({ silent: false });

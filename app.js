@@ -69,6 +69,29 @@ const store = {
   onChange: null, // sync.js 會掛上來，用來偵測要同步的變動
 };
 
+/* ---------- 家人設定連結（網址 #setup=...，不會送到任何伺服器） ---------- */
+const SITE_URL = 'https://t3chhax0r.github.io/777Player/';
+const b64urlEncode = obj => btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64urlDecode = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
+(function applySetupLink() {
+  const m = location.hash.match(/^#setup=([A-Za-z0-9_-]+)/);
+  if (!m) return;
+  // 先把設定從網址列清掉，避免被截圖或留在瀏覽紀錄
+  window.history.replaceState(null, '', location.pathname + location.search);
+  let cfg;
+  try { cfg = b64urlDecode(m[1]); } catch { alert('這個設定連結格式不正確'); return; }
+  const items = [cfg.k && 'chksz API Key', cfg.g && `雲端同步（${cfg.p || '預設'}）`].filter(Boolean);
+  if (!items.length) return;
+  if (!confirm(`要套用這個設定連結嗎？\n\n會設定：${items.join('、')}`)) return;
+  if (cfg.k) store.set('apiKey', cfg.k);
+  if (cfg.g) {
+    store.set('ghToken', cfg.g);
+    store.set('syncProfile', cfg.p || '');
+    localStorage.removeItem('777p:syncMeta'); // 視為第一次連結，與雲端合併
+  }
+  sessionStorage.setItem('777p:setupDone', '1');
+})();
+
 const state = {
   apiKey: store.get('apiKey', '') || (window.APP_CONFIG && window.APP_CONFIG.apiKey) || '',
   authToken: store.get('authToken', '') || (window.APP_CONFIG && window.APP_CONFIG.authToken) || '',
@@ -400,7 +423,7 @@ const audio = $('#audio');
 let playToken = 0;
 let failStreak = 0;
 let errRetryFor = null;
-let history = [];
+let playHistory = [];
 
 const current = () => state.queue[state.index];
 const isCurrent = s => !!s && !!current() && current().id === s.id;
@@ -409,8 +432,8 @@ async function playAt(i, { startAt = 0, fromHistory = false, auto = false, force
   if (i < 0 || i >= state.queue.length) return;
   if (!auto) failStreak = 0;
   if (!fromHistory && state.index >= 0 && state.index !== i && current()) {
-    history.push(current().id);
-    if (history.length > 200) history.shift();
+    playHistory.push(current().id);
+    if (playHistory.length > 200) playHistory.shift();
   }
   const changed = state.index !== i;
   state.index = i;
@@ -488,8 +511,8 @@ function prev() {
   if (!n) return;
   if (audio.currentTime > 5) { audio.currentTime = 0; return; }
   if (state.mode === 'shuffle') {
-    while (history.length) {
-      const i = state.queue.findIndex(s => s.id === history.pop());
+    while (playHistory.length) {
+      const i = state.queue.findIndex(s => s.id === playHistory.pop());
       if (i >= 0) return playAt(i, { fromHistory: true });
     }
   }
@@ -511,7 +534,7 @@ function playList(songs, i) {
   if (!songs.length) return;
   state.queue = songs.map(cloneSong);
   state.index = -1;
-  history = [];
+  playHistory = [];
   playAt(i);
   renderSidebar();
 }
@@ -555,7 +578,7 @@ function clearQueue() {
   state.index = -1;
   state.lastTime = 0;
   store.set('lastTime', 0);
-  history = [];
+  playHistory = [];
   persistQueue();
   updateNowPlaying();
   resetProgress();
@@ -1212,6 +1235,37 @@ function openImport() {
 }
 $('#importBtn').addEventListener('click', openImport);
 $('#mImportBtn').addEventListener('click', openImport);
+
+/* ----- 產生家人設定連結 ----- */
+const familyDlg = $('#familyDlg');
+$('#familyBtn').addEventListener('click', () => {
+  settingsDlg.close();
+  $('#famKey').value = '';
+  $('#famGh').value = store.get('ghToken', '');
+  $('#famOut').value = '';
+  $('#famResult').hidden = true;
+  familyDlg.showModal();
+});
+$('#famGen').addEventListener('click', () => {
+  const p = $('#famProfile').value.trim().toLowerCase();
+  const k = $('#famKey').value.trim();
+  const g = $('#famGh').value.trim();
+  if (!/^[a-z0-9_-]{1,20}$/.test(p)) { toast('同步名稱請用英文小寫或數字，例如 mom'); return; }
+  if (g && p === (store.get('syncProfile', '') || '')) { toast('這是你自己正在用的同步名稱，請換一個，不然資料會混在一起'); return; }
+  if (!k && !g) { toast('至少要填 API Key 或 GitHub Token'); return; }
+  const base = location.protocol.startsWith('http') ? location.origin + location.pathname : SITE_URL;
+  const cfg = { p };
+  if (k) cfg.k = k;
+  if (g) cfg.g = g;
+  $('#famOut').value = `${base}#setup=${b64urlEncode(cfg)}`;
+  $('#famResult').hidden = false;
+});
+$('#famCopy').addEventListener('click', async () => {
+  const out = $('#famOut');
+  try { await navigator.clipboard.writeText(out.value); }
+  catch { out.select(); document.execCommand('copy'); }
+  toast('已複製，用私訊傳給對方');
+});
 $('#mSettingsBtn').addEventListener('click', () => $('#settingsBtn').click());
 importDlg.addEventListener('close', async () => {
   if (importDlg.returnValue !== 'ok') return;
@@ -1246,7 +1300,10 @@ function init() {
     if (d) { const pct = Math.min(100, (state.lastTime / d) * 100); seekEl.value = pct * 10; setFill(seekEl, pct); }
   }
   showView('home');
-  if (!state.apiKey) openSettings();
+  if (sessionStorage.getItem('777p:setupDone')) {
+    sessionStorage.removeItem('777p:setupDone');
+    setTimeout(() => toast('設定完成！可以開始聽歌了'), 300);
+  } else if (!state.apiKey) openSettings();
   refreshUsage();
   warnTokenExpiry();
   // 跨日時更新額度顯示；每 5 分鐘向官方同步一次（不消耗額度）
