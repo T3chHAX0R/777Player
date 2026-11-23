@@ -1,2 +1,10 @@
 # 含 API Key，只留在自己電腦
 config.js
+
+# Android 編譯產物
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.jks
+*.keystore

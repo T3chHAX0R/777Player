@@ -421,4 +421,7 @@ body.is-playing .np-cover { transform: scale(1); }
   color: var(--sub); font: 12px/1.5 ui-monospace, Consolas, monospace; word-break: break-all;
 }
 .hint.warn { color: var(--accent-2); margin-top: 10px; }
-#familyBtn { margin: 2px 0 6px; }
+.setup-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 14px; }
+.paste-row { display: flex; gap: 8px; }
+.paste-row input { flex: 1; min-width: 0; }
+.paste-row .btn { height: 40px; }

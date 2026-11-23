@@ -123,7 +123,16 @@
       <label class="field">同步名稱（選填。家人共用 Token 時各用一個，例如 mom）
         <input id="setProfile" placeholder="留空 = 預設（你自己）" spellcheck="false" autocomplete="off" autocapitalize="off">
       </label>
-      <button type="button" class="btn ghost" id="familyBtn">產生家人設定連結…</button>
+      <div class="setup-btns">
+        <button type="button" class="btn ghost" id="familyBtn">產生家人設定連結…</button>
+        <button type="button" class="btn ghost" id="selfLinkBtn">複製我的設定連結</button>
+      </div>
+      <label class="field">貼上設定連結（在 App 裡設定用）
+        <span class="paste-row">
+          <input id="setupPaste" placeholder="https://…#setup=…" spellcheck="false" autocomplete="off">
+          <button type="button" class="btn ghost" id="setupApplyBtn">套用</button>
+        </span>
+      </label>
       <div class="dlg-actions">
         <button type="button" class="btn ghost" id="syncNowBtn">立即同步</button>
         <button type="button" class="btn ghost" id="clearLrcBtn">清除歌詞快取</button>
@@ -182,6 +191,7 @@
 
   <!-- config.js 只存在你自己的電腦（不會上傳），部署到網路上時找不到也沒關係 -->
   <script src="config.js" onerror="void 0"></script>
+  <script src="native.js"></script>
   <script src="app.js"></script>
   <script src="sync.js"></script>
   <script>

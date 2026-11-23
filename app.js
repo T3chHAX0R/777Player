@@ -73,16 +73,15 @@ const store = {
 const SITE_URL = 'https://t3chhax0r.github.io/777Player/';
 const b64urlEncode = obj => btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const b64urlDecode = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
-(function applySetupLink() {
-  const m = location.hash.match(/^#setup=([A-Za-z0-9_-]+)/);
-  if (!m) return;
-  // 先把設定從網址列清掉，避免被截圖或留在瀏覽紀錄
-  window.history.replaceState(null, '', location.pathname);
+// 套用設定連結的內容；成功回傳 true（呼叫端負責重新整理頁面）
+function applySetupString(text) {
+  const m = String(text || '').match(/#setup=([A-Za-z0-9_-]+)/);
+  if (!m) { alert('這不是 777Player 的設定連結'); return false; }
   let cfg;
-  try { cfg = b64urlDecode(m[1]); } catch { alert('這個設定連結格式不正確'); return; }
+  try { cfg = b64urlDecode(m[1]); } catch { alert('這個設定連結格式不正確'); return false; }
   const items = [cfg.k && 'chksz API Key', cfg.g && `雲端同步（${cfg.p || '預設'}）`].filter(Boolean);
-  if (!items.length) return;
-  if (!confirm(`要套用這個設定連結嗎？\n\n會設定：${items.join('、')}`)) return;
+  if (!items.length) return false;
+  if (!confirm(`要套用這個設定連結嗎？\n\n會設定：${items.join('、')}`)) return false;
   if (cfg.k) store.set('apiKey', cfg.k);
   if (cfg.g) {
     store.set('ghToken', cfg.g);
@@ -90,6 +89,14 @@ const b64urlDecode = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-
     localStorage.removeItem('777p:syncMeta'); // 視為第一次連結，與雲端合併
   }
   sessionStorage.setItem('777p:setupDone', '1');
+  return true;
+}
+(function applySetupLinkFromUrl() {
+  if (!/^#setup=/.test(location.hash)) return;
+  const hash = location.hash;
+  // 先把設定從網址列清掉，避免被截圖或留在瀏覽紀錄
+  window.history.replaceState(null, '', location.pathname);
+  applySetupString(hash);
 })();
 
 const state = {
@@ -419,7 +426,8 @@ const cloneSong = s => ({ id: s.id, name: s.name, artist: s.artist, album: s.alb
 /* =========================================================
  *  播放器核心
  * ========================================================= */
-const audio = $('#audio');
+// 在 Android App 裡改用原生播放器（native.js），一般瀏覽器用 <audio>
+const audio = window.NativeAudio || $('#audio');
 let playToken = 0;
 let failStreak = 0;
 let errRetryFor = null;
@@ -909,7 +917,12 @@ async function doSearch(keyword, more = false) {
   try {
     const params = { limit: 50, offset: s.songs.length };
     const d = await withFallback('搜尋',
-      async () => (await bugpk({ type: 'search', s: keyword, ...params })).data,
+      async () => {
+        const d = (await bugpk({ type: 'search', s: keyword, ...params })).data;
+        // bugpk 偶爾會回「成功」但 0 筆，當作失敗交給 chksz 確認
+        if (!d || !d.songs || (!d.songs.length && !params.offset)) throw new Error('bugpk 搜尋回傳 0 筆');
+        return d;
+      },
       () => api('163_search', { keyword, ...params }));
     if (token !== searchToken) return;
     const seen = new Set(s.songs.map(x => x.id));
@@ -942,7 +955,11 @@ function parsePlaylistId(input) {
 async function importPlaylist(id, silent = false) {
   if (!silent) toast(useBugpk() ? '正在匯入歌單…（bugpk 較慢，請稍候）' : '正在匯入歌單…');
   const d = await withFallback('歌單',
-    async () => (await bugpk({ type: 'playlist', id }, 30000)).data,
+    async () => {
+      const d = (await bugpk({ type: 'playlist', id }, 30000)).data;
+      if (!d || !d.tracks || !d.tracks.length) throw new Error('bugpk 歌單回傳 0 首');
+      return d;
+    },
     () => api('163_playlist', { id }),
     15000);
   const pl = {
@@ -1261,11 +1278,36 @@ $('#famGen').addEventListener('click', () => {
   $('#famOut').value = `${base}?openExternalBrowser=1#setup=${b64urlEncode(cfg)}`;
   $('#famResult').hidden = false;
 });
+async function copyText(text, fallbackEl) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* 改用舊方法 */ }
+  const el = fallbackEl || Object.assign(document.createElement('textarea'), { value: text });
+  if (!fallbackEl) document.body.appendChild(el);
+  el.select();
+  const ok = document.execCommand('copy');
+  if (!fallbackEl) el.remove();
+  return ok;
+}
 $('#famCopy').addEventListener('click', async () => {
-  const out = $('#famOut');
-  try { await navigator.clipboard.writeText(out.value); }
-  catch { out.select(); document.execCommand('copy'); }
+  await copyText($('#famOut').value, $('#famOut'));
   toast('已複製，用私訊傳給對方');
+});
+
+/* ----- 貼上設定連結（App 裡用：LINE 的連結會開到瀏覽器，不會開進 App） ----- */
+$('#setupApplyBtn').addEventListener('click', () => {
+  const v = $('#setupPaste').value.trim();
+  if (!v) { toast('先貼上設定連結'); return; }
+  if (applySetupString(v)) location.reload();
+});
+// 給自己的新裝置（例如手機 App）用的設定連結：內容是這台裝置目前的設定
+$('#selfLinkBtn').addEventListener('click', async () => {
+  const cfg = { p: store.get('syncProfile', '') || '' };
+  if (state.apiKey) cfg.k = state.apiKey;
+  const g = store.get('ghToken', '');
+  if (g) cfg.g = g;
+  if (!cfg.k && !cfg.g) { toast('這台裝置還沒有設定 API Key 或同步'); return; }
+  const base = location.protocol.startsWith('http') ? location.origin + location.pathname : SITE_URL;
+  await copyText(`${base}?openExternalBrowser=1#setup=${b64urlEncode(cfg)}`);
+  toast('已複製這台裝置的設定連結（等同密碼，別外流）');
 });
 $('#mSettingsBtn').addEventListener('click', () => $('#settingsBtn').click());
 importDlg.addEventListener('close', async () => {
