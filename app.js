@@ -747,11 +747,34 @@ document.addEventListener('keydown', e => {
 if ('mediaSession' in navigator) {
   const ms = navigator.mediaSession;
   const set = (a, fn) => { try { ms.setActionHandler(a, fn); } catch { /* 不支援 */ } };
-  set('play', togglePlay);
+  // 耳機／通知列的「播放」「暫停」要明確對應，不能用切換（狀態沒對上時會反過來）
+  set('play', () => {
+    if (!audio.getAttribute('src')) togglePlay(); // 還沒載入音訊（例如剛打開網頁）就先解析
+    else audio.play().catch(() => {});
+  });
   set('pause', () => audio.pause());
+  set('stop', () => audio.pause());
   set('previoustrack', prev);
   set('nexttrack', () => next());
-  set('seekto', d => { if (audio.duration) audio.currentTime = d.seekTime; });
+  set('seekbackward', d => seekBy(-(d.seekOffset || 10)));
+  set('seekforward', d => seekBy(d.seekOffset || 10));
+  set('seekto', d => {
+    if (!audio.duration) return;
+    if (d.fastSeek && 'fastSeek' in audio) audio.fastSeek(d.seekTime);
+    else audio.currentTime = d.seekTime;
+    updatePositionState();
+  });
+
+  // 把進度回報給系統，通知列／鎖屏才會有可拖動的進度條
+  ['loadedmetadata', 'playing', 'pause', 'seeked', 'ratechange'].forEach(ev => audio.addEventListener(ev, updatePositionState));
+}
+function updatePositionState() {
+  if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
+  const d = audio.duration;
+  if (!isFinite(d) || d <= 0) return;
+  try {
+    navigator.mediaSession.setPositionState({ duration: d, playbackRate: audio.playbackRate || 1, position: Math.min(audio.currentTime, d) });
+  } catch { /* 不支援 */ }
 }
 
 window.addEventListener('pagehide', () => store.set('lastTime', state.lastTime));
@@ -1209,7 +1232,9 @@ importDlg.addEventListener('close', async () => {
  * ========================================================= */
 function init() {
   $$('[data-icon]').forEach(el => { el.innerHTML = ic(el.dataset.icon); });
-  audio.volume = state.volume;
+  // 手機沒有音量滑桿，跟原生 App 一樣固定 100%，只用系統音量控制
+  const isTouch = matchMedia('(pointer: coarse)').matches;
+  audio.volume = isTouch ? 1 : state.volume;
   renderVolume();
   renderModeBtn();
   setPlayingUI(false);
